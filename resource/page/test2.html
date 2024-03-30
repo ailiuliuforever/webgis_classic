@@ -1,0 +1,478 @@
+<!--********************************************************************
+* Copyright© 2000 - 2023 SuperMap Software Co.Ltd. All rights reserved.
+*********************************************************************-->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title data-i18n="resources.title_getFeatureByIDs"></title>
+    <script type="text/javascript" include="bootstrap,widgets.alert" src="../js/include-web.js"></script>
+    <script type="text/javascript" exclude="iclient-classic" src="../../dist/classic/include-classic.js"></script>
+
+    <!-- 引入 layui.css -->
+    <link href="//unpkg.com/layui@2.9.7/dist/css/layui.css" rel="stylesheet">
+    <!-- 引入 layui.js -->
+    <script src="//unpkg.com/layui@2.9.7/dist/layui.js"></script>
+    <style>
+        body {
+            width: 100%;
+            height: 100%;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .toolbar {
+            position: absolute;
+            top: 20px;
+            /* 根据需求调整 */
+            right: 20px;
+            /* 根据需求调整 */
+            z-index: 1;
+            /* 确保 '.toolbar' 在 '#map' 之上 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* 使其居中对齐 */
+        }
+
+        .top-buttons {
+            display: flex;
+            justify-content: space-between;
+            /* 在一行内均匀分布 */
+        }
+
+        .bottom-buttons {
+            display: flex;
+            justify-content: space-between;
+            /* 在一行内均匀分布 */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="toolbar">
+        <div class="top-buttons">
+            <button type="button" class="layui-btn" onclick="distanceMeasure()">距离量测</button>
+            <button type="button" class="layui-btn" onclick="polygonMeasure()">面积量测</button>
+        </div>
+        <div class="bottom-buttons">
+            <button type="button" class="layui-btn" onclick="onFeatureSelect()">清除距离</button>
+            <button type="button" class="layui-btn" onclick="areaMeasureStop()">清除面积</button>
+        </div>
+    </div>
+    <div id="map" style="margin:0 auto;width: 100%;height: 100%"></div>
+    <script type="text/javascript" exclude="iclient-classic" src="../../dist/classic/include-classic.js"></script>
+    <script type="text/javascript">
+        var map, layer;
+        var host = window.isLocal ? window.server : "https://iserver.supermap.io";
+        var url1 = host + "/iserver/services/map-world/rest/maps/World";
+
+
+        //距离量算需要的图层
+        var vectorLayer = new SuperMap.Layer.Vector("点和文字");
+        var vectorLayerLine = new SuperMap.Layer.Vector("线");
+        var vectorLayerTmp = new SuperMap.Layer.Vector("临时显示");
+        var vectorLayerX = new SuperMap.Layer.Vector("删除");
+
+        //初始化
+        map = new SuperMap.Map("map", {
+            controls: [
+                new SuperMap.Control.ScaleLine(),
+                new SuperMap.Control.Zoom(),
+                new SuperMap.Control.Navigation({
+                    dragPanOptions: {
+                        enableKinetic: true
+                    }
+                })]
+        });
+
+        layer = new SuperMap.Layer.TiledDynamicRESTLayer("World", url1, {
+            transparent: true,
+            cacheEnabled: true
+        }, { maxResolution: "auto" });
+
+        layer.events.on({ "layerInitialized": addLayer });
+
+        function addLayer() {
+            map.addLayer(layer);
+            map.addLayer(vectorLayer);
+            map.addLayer(vectorLayerTmp);
+            map.addLayer(vectorLayerLine);
+            map.addLayer(vectorLayerX);
+            map.setCenter(new SuperMap.LonLat(0, 0), 0);
+        }
+
+
+
+        var select = new SuperMap.Control.SelectFeature(vectorLayerX, { onSelect: onFeatureSelect });
+        //激活删除事件
+        map.addControl(select);
+
+        //点击删除量算按钮
+        function onFeatureSelect(feature) {
+            vectorLayer.removeAllFeatures();
+            vectorLayerLine.removeAllFeatures();
+            vectorLayerX.removeAllFeatures();
+            select.deactivate();
+        }
+
+        measureControls = {
+            line: new SuperMap.Control.Measure(
+                SuperMap.Handler.Path, { persist: true, immediate: true }
+            )
+        }
+
+        map.events.register("mousemove", undefined, mousePoint);
+
+        function mousePoint(e) {
+            mouseMovePoint = e.xy;
+        }
+        var measure = {}, measurement = {}, measurementClick = [];
+
+        var control;
+        var polygonControl;
+        var control;
+        var clickTimes = 0;
+        var mouseMovePoint = {};
+
+        polygonMeasureControls = {
+            polygon: new SuperMap.Control.Measure(
+                SuperMap.Handler.Polygon, { persist: true, immediate: true }
+            )
+        }
+
+        //清除
+        function areaMeasureStop() {
+            if (polygonControl) {
+                polygonControl.deactivate();
+            }
+            destroyMeasurePopup();
+            destroyMeasurementPopup();
+            destroyMeasurementClickPopup();
+        }
+
+
+        function destroyMeasurePopup() {//销毁双击后的弹窗
+            if (measure.popup)
+                measure.popup.destroy();
+            measure = {};
+
+        }
+        function destroyMeasurementPopup() {//销毁移动中的弹窗
+            if (measurement.popup)
+                measurement.popup.destroy();
+            measurement = {};
+        }
+        function destroyMeasurementClickPopup() {//销毁单击后的弹窗
+            if (measurementClick != undefined && measurementClick != null) {
+                for (var i = 0; i < measurementClick.length; i++) {
+                    if (measurementClick[i].popup)
+                        measurementClick[i].popup.destroy();
+                    //measurementClick[i] = {};
+                }
+                measurementClick = [];
+                clickTimes = 0;
+            }
+        }
+
+
+        for (var key in measureControls) {
+            control = measureControls[key];
+            control.events.on({
+                "measure": handleMeasure,
+                "measurepartial": handleMeasurements
+            });
+            //添加控件到 map 上 
+            map.addControl(control);
+        }
+
+        for (var key in polygonMeasureControls) {
+            polygonControl = polygonMeasureControls[key];
+            polygonControl.events.on({
+                "measure": handelPolygonMeasure,
+                "measurepartial": handelPolygonMeasurements
+            })
+            map.addControl(polygonControl);
+        }
+
+        function distanceMeasure() {
+            polygonControl.deactivate();
+            control.activate();
+        }
+
+        function polygonMeasure() {
+            control.deactivate();
+            polygonControl.activate();
+        }
+
+
+
+        //距离量算结束
+        function handleMeasure(event) {
+            var geometry = event.geometry;
+            control.deactivate();
+            vectorLayerTmp.removeAllFeatures();
+            //获取当前坐标点
+            var pointStart = new SuperMap.Geometry.Point(event.geometry.components[(event.geometry.components.length - 1)].x, event.geometry.components[(event.geometry.components.length - 1)].y);
+            //克隆坐标点 用于显示关闭按钮
+            var pointCopy = pointStart.clone();
+
+            //单位转换
+            var unitString = "";
+            if (event.units == "m") {
+                unitString = "米";
+            } else if (event.units == "km") {
+                unitString = "公里";
+            } else {
+                unitString = "";
+            }
+
+            var f = new SuperMap.Feature.Vector;
+            f.geometry = pointStart;
+            f.style = {
+                label: "总长：" + event.measure.toFixed(1) + unitString,
+                fontColor: 'blue',
+                strokeColor: "blue",
+                strokeOpacity: 1,
+                fillColor: "#31bdec",
+                labelXOffset: 20,
+                labelYOffset: 20,
+                pointRadius: 4
+            };
+            //删除按钮
+            var fc = new SuperMap.Feature.Vector;
+            fc.geometry = pointCopy;
+            fc.style = {
+                externalGraphic: "../img/x.png",
+                strokeColor: "blue",
+                graphicWidth: 16,
+                graphicHeight: 16,
+                strokeOpacity: 1,
+                fillColor: "#31bdec",
+                graphicXOffset: 10,
+                pointRadius: 4
+            };
+            //保存之前绘制的节点用于显示其他样式
+            var points = [];
+            for (var i = 0; i < event.geometry.components.length; i++) {
+                points.push(new SuperMap.Geometry.Point(event.geometry.components[i].x, event.geometry.components[i].y));
+            }
+            var qu = new SuperMap.Geometry.LineString(points);
+            //保留线样式
+            var ff = new SuperMap.Feature.Vector;
+            ff.geometry = qu;
+            ff.style = {
+                strokeColor: "#1e9fff",
+                strokeWidth: 2.5,
+                pointerEvents: "visiblePainted",
+                fillColor: "#1e9fff",
+                fillOpacity: 1
+            };
+            vectorLayerLine.addFeatures(ff);
+            vectorLayer.addFeatures(f);
+            vectorLayerX.addFeatures(fc);
+
+            //激活选择要素的控件
+            select.activate();
+        }
+
+        //距离量算开始
+        function handleMeasurements(event) {
+            var geometry = event.geometry;
+            var type = event.type;
+            //单位转换
+            var unitString = "";
+            if (event.units == "m") {
+                unitString = "米";
+            } else if (event.units == "km") {
+                unitString = "公里";
+            } else {
+                unitString = "";
+            }
+
+            if (type == 'click') {
+                //当==2时为起点
+                if (event.geometry.components.length == 2) {
+                    console.log(event.geometry.components[(event.geometry.components.length - 1)].x)
+                    var pointStart = new SuperMap.Geometry.Point(event.geometry.components[(event.geometry.components.length - 1)].x, event.geometry.components[0].y);
+                    var f = new SuperMap.Feature.Vector;
+                    f.geometry = pointStart;
+                    f.style = {
+                        label: '起点',
+                        fontColor: 'blue',
+                        strokeColor: "blue",
+                        strokeOpacity: 1,
+                        fillColor: "#31bdec",
+                        labelXOffset: 20,
+                        labelYOffset: 20,
+                        pointRadius: 4
+                    };
+                    vectorLayer.addFeatures(f);
+                } else {
+                    //单机节点
+                    var pointStart = new SuperMap.Geometry.Point(event.geometry.components[(event.geometry.components.length - 1)].x, event.geometry.components[(event.geometry.components.length - 1)].y);
+                    var f = new SuperMap.Feature.Vector;
+                    f.geometry = pointStart;
+                    f.style = {
+                        label: event.measure.toFixed(1) + unitString,
+                        fontColor: 'blue',
+                        strokeColor: "blue",
+                        strokeOpacity: 1,
+                        fillColor: "#31bdec",
+                        labelXOffset: 20,
+                        labelYOffset: 20,
+                        pointRadius: 4
+                    };
+                    vectorLayer.addFeatures(f);
+                }
+            } else {
+                //临时显示点信息
+                vectorLayerTmp.removeAllFeatures();
+                var pointStart = new SuperMap.Geometry.Point(event.geometry.components[(event.geometry.components.length - 1)].x, event.geometry.components[(event.geometry.components.length - 1)].y);
+                var f = new SuperMap.Feature.Vector;
+                f.geometry = pointStart;
+                f.style = {
+                    label: event.measure.toFixed(1) + unitString,
+                    fontColor: 'blue',
+                    strokeColor: "blue",
+                    strokeOpacity: 1,
+                    fillColor: "#31bdec",
+                    labelXOffset: 20,
+                    labelYOffset: 20,
+                    pointRadius: 4
+                };
+                vectorLayerTmp.addFeatures(f);
+            }
+        }
+
+        //面积量算结束
+        function handelPolygonMeasurements(event) {
+            //console.log(event);
+            destroyMeasurePopup();
+            destroyMeasurementPopup();
+            var points = event.geometry.components[0].components;
+            // console.log(points);
+            measure.longitude = points[0].x;
+            measure.longlat = points[0].y;
+            // console.log(measure.longitude,measure.longlat);
+            var area = event.measure;
+            // console.log(area);
+            var unit = event.units;
+            // console.log(unit);
+            var zllunit = "";
+            if (unit == 'm') {
+                if (area < 1000) {
+                    zllunit = "米";
+                }
+                else {
+                    area /= 1000000;
+                    zllunit = "公里"
+                }
+            }
+            else {
+                zllunit = "公里"
+            }
+            var css = "border: none;" +
+                "padding: 3px;" +
+                "padding-top: 3px;";
+            var measureContent =
+                "<div id='deleteMeasure' style='font-size: 12px;'>" +
+                "<div style='font-size: 12px;float:left;'>" +
+                "<span>总面积:<span style='color:#ff4500'>" + Number(area.toFixed(2)) + "</span>平方</span>" + zllunit +
+                "</div>" +
+                "<div style='font-size: 12px;float:right;'>" +
+                "<i class=\"fa fa-times\" style=\"" + css + "\" aria-hidden=\"true\"></i>" +
+                "</div>" +
+                "</div>";
+            var popup = new SuperMap.Popup.Anchored("measureDoubleClickWin",
+                new SuperMap.LonLat(measure.longitude, measure.longlat),
+                new SuperMap.Size(12, 16),
+                measureContent,
+                null,
+                false,
+                null);
+            popup.autoSize = true;
+            measure.popup = popup;
+            popup.setBorder("solid 1px red");
+            map.addPopup(popup);
+            $("#measureDoubleClickWin").css("height", "");
+            $("#measureDoubleClickWin_GroupDiv").css("height", "");
+            $("#measureDoubleClickWin_contentDiv\n").css("height", "");
+            $("#measureDoubleClickWin").css("margin-top", "10px");
+            $("#deleteMeasure").click(areaMeasureStop);
+
+        }
+        function handelPolygonMeasure(event) {
+            destroyMeasurePopup();
+            destroyMeasurementPopup();
+            var points = event.geometry.components[0].components;
+            measurement.longitude = points[points.length - 1].x;
+            measurement.longlat = points[points.length - 1].y;
+            var area = event.measure;
+            var unit = event.units;
+            if (unit == 'm') {
+                if (area < 1000) {
+                    zllunit = "米";
+                }
+                else {
+                    area /= 1000000;
+                    zllunit = "公里"
+                }
+            }
+            else {
+                zllunit = "公里"
+            }
+            var css = "border: none;" +
+                "padding: 3px;" +
+                "color:red;" +
+                "padding-top: 3px;";
+            var measureContent =
+                "<div>" +
+                "<div style='font-size: 12px'>" +
+                "<span>总面积:<span style='color:#ff4500'>" + Number(area.toFixed(2)) + "</span>平方</span>" + zllunit +
+                "</div>" +
+                "<div>" +
+                "<span style='font-size: 12px;color:#9E9E9E;'>双击结束面积测量</span>" +
+                "</div>" +
+                "</div>"
+            var popup = new SuperMap.Popup.Anchored("measureMoveWin",
+                new SuperMap.LonLat(measurement.longitude, measurement.longlat),
+                new SuperMap.Size(12, 16),
+                measureContent,
+                null,
+                false,
+                null);
+            popup.autoSize = true;
+            measurement.popup = popup;
+            popup.setBorder("solid 1px red");
+            map.addPopup(popup);
+            $("#measureMoveWin").css("height", "");
+            $("#measureMoveWin_GroupDiv").css("height", "");
+            $("#measureMoveWin_contentDiv\n").css("height", "");
+            var size = map.getSize();
+            if (mouseMovePoint.x > size.w / 2) {
+                $("#measureMoveWin").css("margin-right", "10px");
+            }
+            if (mouseMovePoint.y > size.h / 2) {
+                $("#measureMoveWin").css("margin-bottom", "10px");
+            }
+            if (mouseMovePoint.x <= size.w / 2) {
+                $("#measureMoveWin").css("margin-left", "10px");
+            }
+            if (mouseMovePoint.y <= size.h / 2) {
+                $("#measureMoveWin").css("margin-top", "10px");
+            }
+        }
+    </script>
+
+</body>
+
+</html>

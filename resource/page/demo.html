@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>WebGIS</title>
+   <link rel="stylesheet" href="../css/main.css">
+   <!-- Boxiocns CDN Link -->
+   <link href='https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css' rel='stylesheet'>
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+   <!--侧边导航栏-->
+   <div class="sidebar">
+      <div class="logo-details">
+         <i class='bx bxl-c-plus-plus'></i>
+         <span class="logo_name">Web GIS</span>
+      </div>
+      <ul class="nav-links">
+         <li>
+            <a href="#" onclick="changeIframePage('./test1.html','地点查找')">
+               <i class='bx bx-grid-alt'></i>
+               <span class="link_name">地点查找</span>
+            </a>
+         </li>
+         <li>
+            <a href="#" onclick="changeIframePage('./test2.html','空间量算')">
+               <i class='bx bx-grid-alt'></i>
+               <span class="link_name">空间量算</span>
+            </a>
+         </li>
+         <li>
+            <a href="#" onclick="changeIframePage('./test3.html','空间分析')">
+               <i class='bx bx-grid-alt'></i>
+               <span class="link_name">空间分析</span>
+            </a>
+         </li>
+         <!-- <div class="profile-details">
+            <div class="name-job">
+               <a href='./index.html' style="text-align: center; color: white;">返回</a>
+            </div>
+         </div> -->
+      </ul>
+   </div>
+
+   <section class="home-section">
+      <div class="home-content">
+         <i class='bx bx-menu'></i>
+         <span id="title" class="text">地点查找</span>
+      </div>
+
+      <iframe id="map-iframe" src="./test1.html"></iframe>
+   </section>
+
+   <script>
+      //导航栏动效
+      let arrow = document.querySelectorAll(".arrow");
+      for (var i = 0; i < arrow.length; i++) {
+         arrow[i].addEventListener("click", (e) => {
+            let arrowParent = e.target.parentElement.parentElement;
+            arrowParent.classList.toggle("showMenu");
+         });
+      }
+      let sidebar = document.querySelector(".sidebar");
+      let sidebarBtn = document.querySelector(".bx-menu");
+      console.log(sidebarBtn);
+      sidebarBtn.addEventListener("click", () => {
+         sidebar.classList.toggle("close");
+      });
+
+      //切换页面
+      function changeIframePage(url, title) {
+         var iframe = document.getElementById("map-iframe");
+         console.log(iframe.src)
+         iframe.src = url;
+         changeTitle(title)
+      }
+
+      /**
+    * 该函数用于更改指定ID的<span>元素的文本内容。
+    * @param {string} title - 要设置的新标题文本。
+    */
+      function changeTitle(title) {
+         console.log("执行");
+         // 获取class为"text"的span元素
+         const spanElement = document.getElementById('title');
+
+         // 检查是否成功获取到元素
+         if (spanElement) {
+            spanElement.textContent = title;
+         } else {
+            console.warn("没有找到具有给定ID的<span>元素。");
+         }
+      }
+   </script>
+</body>
+
+</html>
