@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <style>
+      /* Add some basic styling for the custom dialog */
+      .dialog-container {
+         position: fixed;
+         top: 50%;
+         left: 50%;
+         transform: translate(-50%, -50%);
+         background-color: white;
+         padding: 20px;
+         border-radius: 5px;
+         box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+         z-index: 999;
+      }
+
+      .dialog-close-button {
+         float: right;
+         cursor: pointer;
+         font-size: 20px;
+         line-height: 1;
+         color: #000;
+         text-shadow: 0 1px 0 #fff;
+         opacity: 0.5;
+      }
+
+      .dialog-close-button:hover {
+         opacity: 1;
+      }
+   </style>
+</head>
+
+<body>
+
+   <!-- Button to trigger the function -->
+   <button onclick="showInfoForm()">Click to Collect Information</button>
+
+   <script>
+      function showInfoForm() {
+         // Create a new div element for the dialog container
+         const dialogContainer = document.createElement('div');
+         dialogContainer.className = 'dialog-container';
+
+         // Close button for the dialog
+         const closeButton = document.createElement('span');
+         closeButton.className = 'dialog-close-button';
+         closeButton.innerHTML = '&times;';
+         closeButton.onclick = () => dialogContainer.remove();
+
+         // Append the close button to the dialog container
+         dialogContainer.appendChild(closeButton);
+
+         // Create the form and its input elements
+         const form = document.createElement('form');
+         const nameInput = document.createElement('input');
+         const emailInput = document.createElement('input');
+         const messageInput = document.createElement('textarea');
+
+         // Set form attributes and input types
+         form.action = '/submit-info'; // Replace with your actual endpoint URL
+         form.method = 'POST';
+         nameInput.type = 'text';
+         nameInput.name = 'name';
+         emailInput.type = 'email';
+         emailInput.name = 'email';
+         messageInput.name = 'message';
+
+         // Add labels and required attributes
+         const nameLabel = document.createElement('label');
+         const emailLabel = document.createElement('label');
+         const messageLabel = document.createElement('label');
+         nameLabel.textContent = 'Name:';
+         nameLabel.htmlFor = 'name';
+         emailLabel.textContent = 'Email:';
+         emailLabel.htmlFor = 'email';
+         messageLabel.textContent = 'Message:';
+         nameInput.required = true;
+         emailInput.required = true;
+         messageInput.required = true;
+
+         // Append form elements to the form
+         form.appendChild(nameLabel);
+         form.appendChild(nameInput);
+         form.appendChild(emailLabel);
+         form.appendChild(emailInput);
+         form.appendChild(messageLabel);
+         form.appendChild(messageInput);
+
+         // Add a submit button to the form
+         const submitButton = document.createElement('button');
+         submitButton.type = 'submit';
+         submitButton.textContent = 'Submit';
+         form.appendChild(submitButton);
+
+         // Append the form to the dialog container
+         dialogContainer.appendChild(form);
+
+         // Append the dialog container to the body
+         document.body.appendChild(dialogContainer);
+      }
+   </script>
+
+</body>
+
+</html>

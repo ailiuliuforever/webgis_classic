@@ -19,12 +19,12 @@
          <span class="logo_name">Web GIS</span>
       </div>
       <ul class="nav-links">
-         <li>
+         <!-- <li>
             <a href="#" onclick="changeIframePage('./test1.html','地点查找')">
                <i class='bx bx-grid-alt'></i>
                <span class="link_name">地点查找</span>
             </a>
-         </li>
+         </li> -->
          <li>
             <a href="#" onclick="changeIframePage('./test2.html','空间量算')">
                <i class='bx bx-grid-alt'></i>
@@ -35,6 +35,12 @@
             <a href="#" onclick="changeIframePage('./test3.html','空间分析')">
                <i class='bx bx-grid-alt'></i>
                <span class="link_name">空间分析</span>
+            </a>
+         </li>
+         <li>
+            <a href="#" onclick="changeIframePage('./test5.html','地物编辑')">
+               <i class='bx bx-grid-alt'></i>
+               <span class="link_name">地物编辑</span>
             </a>
          </li>
          <!-- <div class="profile-details">
@@ -51,7 +57,7 @@
          <span id="title" class="text">地点查找</span>
       </div>
 
-      <iframe id="map-iframe" src="./test1.html"></iframe>
+      <iframe id="map-iframe" src="./test2.html"></iframe>
    </section>
 
    <script>
@@ -86,7 +92,6 @@
          console.log("执行");
          // 获取class为"text"的span元素
          const spanElement = document.getElementById('title');
-
          // 检查是否成功获取到元素
          if (spanElement) {
             spanElement.textContent = title;
